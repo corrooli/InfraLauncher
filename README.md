@@ -16,6 +16,10 @@
   <img alt="License AGPL-3.0" src="https://img.shields.io/badge/license-AGPL--3.0-3fb950">
 </p>
 
+<p align="center">
+  <img src="docs/screenshot-grid-dark.png" width="860" alt="InfraLauncher showing services as app icons, grouped into Infrastructure, Monitoring and Apps">
+</p>
+
 ---
 
 ## Why
@@ -27,18 +31,25 @@ ssh -N -L 8006:192.168.1.10:8006 me@jumphost
 # new terminal tab, open browser, type localhost:8006, forget which port was which...
 ```
 
-InfraLauncher keeps those commands in a list. Each row has a switch and a button. The switch starts or stops the tunnel. The button starts it if needed, waits until the ports are really listening, and then opens the URL in your browser. Shell entries open a Terminal window with the SSH session instead.
+InfraLauncher keeps those commands in one place, grouped the way you think about them. Click a service and it starts the tunnel if needed, waits until the ports are really listening, and then opens the URL in your browser. Shell entries open a window in Terminal, iTerm2 or another terminal app instead.
 
-It's one Swift file, it builds with the Command Line Tools, and it doesn't phone home or need an account. Your list stays on your Mac.
+It's a handful of Swift files, it builds with the Command Line Tools, and it doesn't phone home or need an account. Your list stays on your Mac.
 
 ## What it does
 
-- **Tunnel and open in one go.** Click the arrow and the page opens as soon as the forward is up, not before.
+- **Tunnel and open in one go.** Click a service and the page opens as soon as the forward is up, not before.
+- **Icons or a list.** Switch between an app-icon grid and a compact list with <kbd>⌘</kbd> <kbd>1</kbd> / <kbd>⌘</kbd> <kbd>2</kbd>. Every service gets an icon and color picked from its name (Proxmox, Grafana, Pi-hole, NAS, …), and you can choose your own.
+- **Groups.** Sort services into groups like *Infrastructure* or *Customer A*. Collapse them, start or stop every tunnel in a group at once, and see at a glance where something is running.
+- **Drag to rearrange.** Drag services to reorder them, into another group, or onto a group in the sidebar.
+- **Find things fast.** Search by name, command or URL. Collections for *Active*, *Web* and *Shells* sit at the top of the sidebar.
+- **A builder for the command.** In Simple mode you fill in the address, port and SSH host and the `ssh -L` command and URL are written for you, with a free local port picked automatically. Switch to Command mode any time to write it yourself.
+- **Menu bar.** Start tunnels and open services from the menu bar without bringing up the window.
 - **Knows when a tunnel is actually ready.** It runs `ssh -v` and watches for every `-L` port to report "listening". The dot turns green only then.
 - **Clear errors.** Wrong key, host down, DNS failure, port already taken: the row tells you in plain words instead of a dead browser tab.
 - **Several forwards per entry.** Put Prometheus and Alertmanager into one entry with two `-L` and two URLs, and both tabs open.
-- **Shells too.** Entries without a URL open in Terminal.app, for example `ssh -J jumphost admin@192.168.1.40`.
-- **Ask for a value.** Write `<ip>` (or `<host>`, or any `<name>`) in a command and the row gets a small text field for it. Handy for "shell on whatever box I need right now".
+- **Shells too.** Entries without a URL open in Terminal, iTerm2, Ghostty, kitty, WezTerm or Alacritty (pick one in Settings), for example `ssh -J jumphost admin@192.168.1.40`.
+- **Ask for a value.** Write `<ip>` (or `<host>`, or any `<name>`) in a command and you're asked for it when you open the service. The last few values are remembered. Handy for "shell on whatever box I need right now".
+- **Uptime.** Running tunnels show how long they've been connected.
 - **Checks ports before it starts.** If something else already sits on the local port, you get told up front.
 - **Stays alive.** Keepalives are set, so a dead connection shows up as an error instead of hanging forever.
 - **Cleans up after itself.** Quit the app or close the window and every tunnel it started goes with it. No orphaned `ssh` processes holding your ports.
@@ -46,9 +57,21 @@ It's one Swift file, it builds with the Command Line Tools, and it doesn't phone
 ## Requirements
 
 - macOS 14 Sonoma or newer
-- Apple Silicon (Intel works too, see [below](#intel-macs))
+- Apple Silicon or Intel
 - Xcode Command Line Tools: `xcode-select --install`
 - SSH **key** login to your jump host. Tunnels run in the background with `BatchMode=yes`, so there's nowhere to type a password.
+
+## Download
+
+Grab `InfraLauncher.zip` from the [latest release](https://github.com/corrooli/InfraLauncher/releases/latest), unzip it and move `InfraLauncher.app` to Applications. It runs on Apple Silicon and Intel.
+
+The app is not notarized, so macOS blocks it on first launch. Either open **System Settings → Privacy & Security** and click **Open Anyway**, or remove the quarantine flag once:
+
+```sh
+xattr -dr com.apple.quarantine /Applications/InfraLauncher.app
+```
+
+If you'd rather not trust a downloaded binary, build it yourself; it takes about a minute.
 
 ## Build and install
 
@@ -85,17 +108,32 @@ Anything you set up in `~/.ssh/config` (ports, users, `ProxyJump`, other aliases
 
 ### 2. Make the list yours
 
-On first launch you get a handful of examples. Hover a row and click the slider icon, or right click and pick **Edit…**, to change it. The **+** in the toolbar adds a new one.
+On first launch you get a handful of examples. Right click a service and pick **Edit…** (or hover a row in list view and click ⓘ) to change it. The **+** in the toolbar, or <kbd>⌘</kbd> <kbd>N</kbd>, adds a new one. **New Group** at the bottom of the sidebar makes a group.
 
-Every entry has three fields:
+<p align="center">
+  <img src="docs/screenshot-editor-dark.png" width="720" alt="The service editor in Simple mode: address, port, SSH host and local port, with the generated ssh command below">
+</p>
 
-| Field   | What goes in                                                                 |
-|---------|------------------------------------------------------------------------------|
-| Name    | Whatever you want to see in the list                                         |
-| Command | The full shell command, usually `ssh -N -L ...`                              |
-| Open    | One URL per line. Leave it empty and the entry becomes a Terminal shortcut   |
+The editor has two modes:
 
-The editor shows which local ports it found in your command, so you can check before saving.
+**Simple** is for the common cases. Pick *Web Interface* or *Shell* and fill in a few fields:
+
+| Field      | What goes in                                                                                  |
+|------------|-----------------------------------------------------------------------------------------------|
+| Service    | `https://` or `http://`, the address and port as the SSH host sees them, and an optional path |
+| Through    | The SSH host that can reach it, e.g. `jumphost` or `admin@jump.example.com`                   |
+| Local port | Leave it empty and a free one is chosen (ports below 1024 become 8000 + port, so 443 → 8443)  |
+
+For a shell you enter user, server and port, and optionally a jump host. Leave the jump host empty for a direct connection. The bubble button next to the address makes it ask for the host each time you open the service.
+
+**Command** is the raw form, for everything else:
+
+| Field   | What goes in                                                                     |
+|---------|----------------------------------------------------------------------------------|
+| Command | The full shell command, usually `ssh -N -L ...`                                  |
+| Open    | One URL per line. Leave it empty and the entry opens in your terminal instead    |
+
+The editor shows which local ports it found and warns you if another service already uses one of them. Click the icon at the top left to pick a different symbol or color.
 
 ## Command recipes
 
@@ -156,21 +194,36 @@ For these the app can't see the ports, so it counts the entry as up once the pro
 
 ## Using it
 
+<p align="center">
+  <img src="docs/screenshot-list-light.png" width="860" alt="List view in light mode with switches and Open buttons per service">
+</p>
+
 | Action | How |
 |---|---|
-| Start or stop a tunnel | The switch on the row |
-| Connect and open in the browser | The arrow button |
-| Open a shell entry | The terminal button |
-| Edit, copy the command, delete | Right click a row |
+| Connect and open in the browser | Click the icon, or **OPEN** in list view |
+| Start or stop only the tunnel | The switch in list view, or the power button when you hover an icon |
+| Open a shell entry | Click it. It opens in the terminal app chosen in Settings |
+| Edit, duplicate, move to a group, copy, delete | Right click a service |
+| Reorder or regroup | Drag it |
+| Start or stop a whole group | The ⋯ menu on the group header, or right click the group in the sidebar |
+| Switch between icons and list | <kbd>⌘</kbd> <kbd>1</kbd> / <kbd>⌘</kbd> <kbd>2</kbd>, or the toolbar |
+| Search | The search field in the toolbar |
+| New service / new group | <kbd>⌘</kbd> <kbd>N</kbd> / <kbd>⇧</kbd> <kbd>⌘</kbd> <kbd>N</kbd> |
 | Stop every tunnel | Toolbar button, or <kbd>⌘</kbd> <kbd>.</kbd> |
-| Get the example list back | File menu, **Restore Default Services** |
+| Get the example list back | File menu, **Restore Example Services…** |
 
-The dot on the left tells you the state:
+The icon tells you the state:
 
-- grey: off
-- orange, pulsing: connecting
-- green: all ports are listening
-- red: failed, the reason is right below the name
+- no badge: off
+- orange ring running around it: connecting
+- green badge: all ports are listening
+- red badge: failed, the reason is right below the name
+
+### Menu bar and Settings
+
+The menu bar icon lists all services with their state, a switch and an **OPEN** button. While it's on, closing the window keeps InfraLauncher and its tunnels running in the background. Quitting the app (<kbd>⌘</kbd> <kbd>Q</kbd> or **Quit** in the menu bar panel) still stops every tunnel. You can turn the icon off in **Settings** (<kbd>⌘</kbd> <kbd>,</kbd>); then closing the window quits the app like before.
+
+Settings is also where you choose the terminal for shell entries. Only apps you have installed are listed. For iTerm2, macOS asks once whether InfraLauncher may control it; that's how it opens a new window with the command.
 
 If you change the command of a running tunnel, it restarts with the new settings when you save.
 
@@ -195,20 +248,24 @@ Your list is saved as plain JSON here:
 
 ```
 ~/Library/Application Support/InfraLauncher/services.json
+~/Library/Application Support/InfraLauncher/groups.json
 ```
 
-You can back it up, sync it, or edit it by hand while the app is closed. Each entry looks like this:
+You can back them up, sync them, or edit them by hand while the app is closed. A service looks like this:
 
 ```json
 {
   "id" : "6F1C2A4E-3B7D-4C1A-9E0F-2D8B5A7C1E33",
   "name" : "Proxmox",
   "command" : "ssh -N -L 8006:192.168.1.10:8006 jumphost",
-  "urls" : [ "https://localhost:8006" ]
+  "urls" : [ "https://localhost:8006" ],
+  "groupID" : "A1F0C2D4-0001-4000-8000-000000000001",
+  "symbol" : "server.rack",
+  "color" : "orange"
 }
 ```
 
-Any unique UUID works for `id`. Delete the file and the app starts over with the examples.
+`groupID`, `symbol` and `color` are optional; without `symbol` and `color` the icon is picked from the name. Files from version 1 load as they are, with every service ungrouped. Any unique UUID works for `id`. Delete `services.json` and the app starts over with the examples.
 
 ## Troubleshooting
 
@@ -226,28 +283,20 @@ lsof -nP -iTCP:8006 -sTCP:LISTEN
 
 **The browser warns about the certificate.** Expected. Things like Proxmox, DSM or OPNsense have certificates for their real name, not for `localhost`. Accept it once, or add the real name to `/etc/hosts` pointing at `127.0.0.1` and use that in the URL.
 
-## Intel Macs
-
-Change the target in `build.sh` from
-
-```
--target arm64-apple-macos14.0
-```
-
-to
-
-```
--target x86_64-apple-macos14.0
-```
-
-and build as usual.
-
 ## Project layout
 
 ```
-InfraLauncher.swift   the whole app: model, tunnel handling, SwiftUI views
-icon.swift            draws the app icon at build time
-build.sh              compiles, bundles, signs, optionally installs
+Sources/
+  App.swift             app entry, menus, Settings, menu bar panel
+  Model.swift           services, groups, colors, icon guessing
+  Store.swift           saving, tunnel processes and their state
+  MainWindow.swift      sidebar, icon grid, list
+  Components.swift      icons, badges, buttons and pickers shared by the views
+  Editors.swift         service and group editors
+  CommandBuilder.swift  Simple mode: builds and reads ssh commands
+  Terminals.swift       opening shells in Terminal, iTerm2, Ghostty, …
+icon.swift              draws the app icon at build time
+build.sh                compiles, bundles, signs, optionally installs
 ```
 
 No Xcode project, no dependencies, no package manager. Issues and pull requests are welcome.

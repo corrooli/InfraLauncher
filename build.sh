@@ -9,8 +9,13 @@ APP=build/InfraLauncher.app
 rm -rf "$APP" build/AppIcon.iconset
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources"
 
-swiftc -O -swift-version 5 -parse-as-library -target arm64-apple-macos14.0 \
-  InfraLauncher.swift -o "$APP/Contents/MacOS/InfraLauncher"
+# Universal: one pass each for Apple Silicon and Intel, then merge.
+for arch in arm64 x86_64; do
+  swiftc -O -swift-version 5 -parse-as-library -target $arch-apple-macos14.0 \
+    Sources/*.swift -o build/InfraLauncher-$arch
+done
+lipo -create build/InfraLauncher-arm64 build/InfraLauncher-x86_64 -output "$APP/Contents/MacOS/InfraLauncher"
+rm build/InfraLauncher-arm64 build/InfraLauncher-x86_64
 
 swift icon.swift build/AppIcon.iconset
 iconutil -c icns build/AppIcon.iconset -o "$APP/Contents/Resources/AppIcon.icns"
@@ -26,10 +31,11 @@ cat > "$APP/Contents/Info.plist" <<'PLIST'
   <key>CFBundleExecutable</key>       <string>InfraLauncher</string>
   <key>CFBundleIconFile</key>         <string>AppIcon</string>
   <key>CFBundlePackageType</key>      <string>APPL</string>
-  <key>CFBundleShortVersionString</key><string>1.0</string>
-  <key>CFBundleVersion</key>          <string>1</string>
+  <key>CFBundleShortVersionString</key><string>2.0</string>
+  <key>CFBundleVersion</key>          <string>2</string>
   <key>LSMinimumSystemVersion</key>   <string>14.0</string>
   <key>NSHighResolutionCapable</key>  <true/>
+  <key>NSAppleEventsUsageDescription</key><string>InfraLauncher opens shell services in iTerm2 when you pick it as your terminal.</string>
 </dict>
 </plist>
 PLIST
